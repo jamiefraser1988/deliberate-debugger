@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deliberate Debugger</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+      color: #a78bfa;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #64748b;
+      margin-bottom: 2rem;
+      font-size: 0.9rem;
+    }
+
+    .card {
+      background: #1e2130;
+      border: 1px solid #2d3148;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      max-width: 860px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+      margin-bottom: 0.5rem;
+    }
+
+    textarea, input[type="text"] {
+      width: 100%;
+      background: #0f1117;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      color: #e2e8f0;
+      padding: 0.75rem;
+      font-family: 'Courier New', monospace;
+      font-size: 0.875rem;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    textarea:focus, input[type="text"]:focus {
+      border-color: #7c3aed;
+    }
+
+    .fix-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .fix-row input { flex: 1; resize: none; }
+
+    .btn {
+      border: none;
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-ghost {
+      background: #2d3148;
+      color: #94a3b8;
+    }
+
+    .btn-primary {
+      background: #7c3aed;
+      color: #fff;
+      width: 100%;
+      padding: 0.75rem;
+      font-size: 1rem;
+      margin-top: 0.5rem;
+    }
+
+    .btn-remove {
+      background: #3f1f1f;
+      color: #f87171;
+      padding: 0.5rem 0.75rem;
+      flex-shrink: 0;
+    }
+
+    /* Mode badges */
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 1rem;
+    }
+
+    .badge-normal  { background: #14532d; color: #86efac; }
+    .badge-replan  { background: #78350f; color: #fcd34d; }
+    .badge-handoff { background: #450a0a; color: #fca5a5; }
+
+    /* Score meter */
+    .score-bar-wrap { margin-bottom: 1rem; }
+    .score-label { font-size: 0.8rem; color: #94a3b8; margin-bottom: 0.3rem; }
+    .score-bar {
+      height: 8px;
+      background: #2d3148;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .score-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.4s ease;
+    }
+
+    /* Sections within response */
+    .section { margin-bottom: 1.25rem; }
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #7c3aed;
+      margin-bottom: 0.5rem;
+    }
+
+    ul.plain { list-style: none; }
+    ul.plain li { padding: 0.3rem 0; border-bottom: 1px solid #1e2130; color: #cbd5e1; font-size: 0.9rem; }
+    ul.plain li:last-child { border-bottom: none; }
+
+    .hyp-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.4rem 0;
+      border-bottom: 1px solid #1e2130;
+    }
+
+    .hyp-row:last-child { border-bottom: none; }
+
+    .conf-bar {
+      flex-shrink: 0;
+      width: 80px;
+      height: 6px;
+      background: #2d3148;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .conf-fill { height: 100%; background: #7c3aed; border-radius: 999px; }
+
+    .conf-num { font-size: 0.75rem; color: #64748b; flex-shrink: 0; }
+
+    .spinner {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 2px solid #7c3aed;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.5rem;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-box {
+      background: #450a0a;
+      border: 1px solid #7f1d1d;
+      border-radius: 8px;
+      padding: 1rem;
+      color: #fca5a5;
+      font-size: 0.875rem;
+    }
+
+    .issues-list li { color: #fcd34d; }
+
+    #result { display: none; }
+  </style>
+</head>
+<body>
+
+<h1>Deliberate Debugger</h1>
+<p class="subtitle">Powered by Claude · Structured debugging with quality gating</p>
+
+<div class="card">
+  <div style="margin-bottom:1rem">
+    <label for="problem">Problem / Error</label>
+    <textarea id="problem" rows="4" placeholder="Describe the bug or paste the error message…"></textarea>
+  </div>
+
+  <div style="margin-bottom:1rem">
+    <label for="code">Code Snippet <span style="font-weight:400;color:#4b5563">(optional)</span></label>
+    <textarea id="code" rows="6" placeholder="Paste relevant code here…"></textarea>
+  </div>
+
+  <div style="margin-bottom:1rem">
+    <label>Attempted Fixes <span style="font-weight:400;color:#4b5563">(optional)</span></label>
+    <div id="fixes-list"></div>
+    <button class="btn btn-ghost" onclick="addFix()" style="margin-top:0.5rem">+ Add fix</button>
+  </div>
+
+  <button class="btn btn-primary" id="submit-btn" onclick="submit()">Debug It</button>
+</div>
+
+<div id="result" class="card"></div>
+
+<script>
+const API = 'http://localhost:8000';
+
+
+function addFix(val = '') {
+  const list = document.getElementById('fixes-list');
+  const row = document.createElement('div');
+  row.className = 'fix-row';
+  row.innerHTML = `
+    <input type="text" placeholder="What did you try?" value="${val}" />
+    <button class="btn btn-remove" onclick="this.parentElement.remove()">✕</button>
+  `;
+  list.appendChild(row);
+}
+
+async function submit() {
+  const problem = document.getElementById('problem').value.trim();
+  if (!problem) { alert('Please describe the problem.'); return; }
+
+  const code = document.getElementById('code').value.trim();
+  const attempted_fixes = [...document.querySelectorAll('#fixes-list input')]
+    .map(i => i.value.trim()).filter(Boolean);
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Thinking…';
+
+  const resultEl = document.getElementById('result');
+  resultEl.style.display = 'none';
+  resultEl.innerHTML = '';
+
+  try {
+    const res = await fetch(`${API}/debug`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ problem, code, attempted_fixes }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Server error ${res.status}: ${err}`);
+    }
+
+    const data = await res.json();
+    renderResult(data, resultEl);
+  } catch (e) {
+    resultEl.innerHTML = `<div class="error-box">⚠ ${e.message}</div>`;
+  } finally {
+    resultEl.style.display = 'block';
+    btn.disabled = false;
+    btn.innerHTML = 'Debug It';
+  }
+}
+
+function scoreColor(score) {
+  if (score >= 70) return '#22c55e';
+  if (score >= 40) return '#f59e0b';
+  return '#ef4444';
+}
+
+function renderResult(data, el) {
+  const { mode, response, handoff, judge } = data;
+  const score = judge?.score ?? 0;
+  const resp = response || {};
+
+  let badge = '';
+  if (mode === 'normal')  badge = '<span class="badge badge-normal">✓ Passed</span>';
+  if (mode === 'replan')  badge = '<span class="badge badge-replan">⟳ Replanned</span>';
+  if (mode === 'handoff') badge = '<span class="badge badge-handoff">↩ Handoff</span>';
+
+  let html = badge;
+
+  // Score bar
+  html += `
+    <div class="score-bar-wrap">
+      <div class="score-label">Quality score: ${score}/100</div>
+      <div class="score-bar">
+        <div class="score-fill" style="width:${score}%;background:${scoreColor(score)}"></div>
+      </div>
+    </div>`;
+
+  // Issues (replan / handoff)
+  if (judge?.issues?.length) {
+    html += `<div class="section">
+      <div class="section-title">Issues Found</div>
+      <ul class="plain issues-list">${judge.issues.map(i => `<li>⚠ ${esc(i)}</li>`).join('')}</ul>
+    </div>`;
+  }
+
+  if (mode === 'handoff' && handoff) {
+    // Handoff view
+    html += section('Goal', `<p style="color:#cbd5e1;font-size:.9rem">${esc(handoff.goal)}</p>`);
+    html += listSection('Confirmed Facts', handoff.confirmed_facts);
+    html += listSection('Dead Ends', handoff.dead_ends);
+    html += listSection('Open Hypotheses', handoff.open_hypotheses);
+    html += listSection('Next Steps', handoff.next_steps);
+  } else {
+    // Normal / replan view
+    if (resp.summary) {
+      html += section('Summary', `<p style="color:#cbd5e1;font-size:.9rem">${esc(resp.summary)}</p>`);
+    }
+    if (resp.facts?.length) {
+      html += listSection('Confirmed Facts', resp.facts);
+    }
+    if (resp.hypotheses?.length) {
+      html += section('Hypotheses',
+        resp.hypotheses.map(h => `
+          <div class="hyp-row">
+            <span style="flex:1;color:#cbd5e1;font-size:.9rem">${esc(h.cause)}</span>
+            <div class="conf-bar"><div class="conf-fill" style="width:${Math.round((h.confidence||0)*100)}%"></div></div>
+            <span class="conf-num">${Math.round((h.confidence||0)*100)}%</span>
+          </div>`).join('')
+      );
+    }
+    if (resp.tests?.length) {
+      html += numberedSection('Tests', resp.tests);
+    }
+    if (resp.fixes?.length) {
+      html += numberedSection('Suggested Fixes', resp.fixes);
+    }
+  }
+
+  el.innerHTML = html;
+}
+
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function section(title, body) {
+  return `<div class="section"><div class="section-title">${title}</div>${body}</div>`;
+}
+
+function listSection(title, items) {
+  if (!items?.length) return '';
+  return section(title, `<ul class="plain">${items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>`);
+}
+
+function numberedSection(title, items) {
+  if (!items?.length) return '';
+  return section(title,
+    `<ul class="plain">${items.map((i,n) => `<li><strong style="color:#7c3aed;margin-right:.5rem">${n+1}.</strong>${esc(i)}</li>`).join('')}</ul>`
+  );
+}
+</script>
+</body>
+</html>

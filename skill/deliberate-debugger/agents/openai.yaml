@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deliberate Debugger"
+  short_description: "Hypothesis-first debugging via the local API"
+  default_prompt: "Use the deliberate-debugger skill to call the local API, inspect the returned mode, and validate hypotheses before applying fixes."

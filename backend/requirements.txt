@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pydantic
+anthropic
+openai
+pytest
+pytest-asyncio
+httpx
