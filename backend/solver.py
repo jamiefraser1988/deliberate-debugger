@@ -21,12 +21,27 @@ from typing import Any, Dict
 
 PROVIDER = os.environ.get("SOLVER_PROVIDER", "anthropic").lower()
 
-if PROVIDER == "openai":
-    from openai import OpenAI as _OpenAI
-    _openai_client = _OpenAI()
-else:
-    import anthropic as _anthropic
-    _anthropic_client = _anthropic.Anthropic()
+# Clients are constructed lazily on first call. Eager construction at import
+# time required an API key just to import `main` (and therefore to collect
+# tests), even though tests mock the solver.
+_anthropic_client = None
+_openai_client = None
+
+
+def _get_anthropic_client():
+    global _anthropic_client
+    if _anthropic_client is None:
+        import anthropic
+        _anthropic_client = anthropic.Anthropic()
+    return _anthropic_client
+
+
+def _get_openai_client():
+    global _openai_client
+    if _openai_client is None:
+        from openai import OpenAI
+        _openai_client = OpenAI()
+    return _openai_client
 
 
 # ---------------------------------------------------------------------------
@@ -76,9 +91,9 @@ def _extract_json(text: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def _call_anthropic(system: str, user: str) -> str:
-    """Call claude-opus-4-6 with adaptive thinking and return the text block."""
-    with _anthropic_client.messages.stream(
-        model="claude-opus-4-6",
+    """Call Claude with adaptive thinking and return the text block."""
+    with _get_anthropic_client().messages.stream(
+        model=os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-7"),
         max_tokens=4096,
         thinking={"type": "adaptive"},
         system=system,
@@ -94,8 +109,8 @@ def _call_anthropic(system: str, user: str) -> str:
 
 def _call_openai(system: str, user: str) -> str:
     """Call gpt-4o with JSON response format and return the content string."""
-    response = _openai_client.chat.completions.create(
-        model="gpt-4o",
+    response = _get_openai_client().chat.completions.create(
+        model=os.environ.get("OPENAI_MODEL", "gpt-4o"),
         response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": system},

@@ -112,6 +112,28 @@ def test_score_does_not_go_below_zero():
 # issues list
 # ---------------------------------------------------------------------------
 
+def test_short_attempted_fix_does_not_false_positive():
+    """A short attempted fix like "fix" must not match every fix string.
+
+    Previously the substring check would penalise any fix that contained the
+    word — e.g. attempted="fix" matching fix="reinstall the package".
+    """
+    resp = _good_response()
+    resp["fixes"] = ["reinstall the package"]
+    state = {"attempted_fixes": ["fix"]}
+    result = judge_response(resp, state)
+    assert result["action"] == "pass"
+    assert result["score"] == 100
+
+
+def test_unrelated_fix_with_overlapping_word_does_not_match():
+    resp = _good_response()
+    resp["fixes"] = ["upgrade pydantic to v2"]
+    state = {"attempted_fixes": ["upgrade fastapi to 0.110"]}
+    result = judge_response(resp, state)
+    assert result["action"] == "pass"
+
+
 def test_issues_populated_on_replan():
     # Score 40 → replan: no hypotheses (-30), no tests (-30), no fixes (no -20)
     resp = _good_response()

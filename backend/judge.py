@@ -6,7 +6,37 @@ rules. The purpose of this component is to detect shallow or repetitive answers
 and decide whether the solver's response can be accepted, whether it should
 replan, or whether a full handoff/reset is required.
 """
-from typing import Dict, Any, List
+import re
+from typing import Dict, Any, List, Set
+
+_STOPWORDS = {
+    "a", "an", "the", "and", "or", "to", "of", "in", "on", "for", "with",
+    "is", "it", "be", "this", "that", "by", "as", "at", "from", "if", "then",
+    "try", "tried", "fix", "fixes", "issue", "bug", "problem",
+}
+
+
+def _tokens(text: str) -> Set[str]:
+    """Normalize a fix description into a set of significant tokens."""
+    return {
+        t for t in re.findall(r"[a-z0-9]+", text.lower())
+        if len(t) >= 3 and t not in _STOPWORDS
+    }
+
+
+def _is_repeated_fix(attempted: str, fix: str) -> bool:
+    """True when `fix` is substantially the same as a previously attempted one.
+
+    Uses Jaccard overlap on significant tokens (with stopwords stripped) to
+    avoid the false positives of a raw substring check — e.g. attempted="fix"
+    no longer matches every fix string that contains the word "fix".
+    """
+    a, b = _tokens(attempted), _tokens(fix)
+    if not a or not b:
+        # Fall back to normalized equality when there are no significant tokens.
+        return attempted.strip().lower() == fix.strip().lower()
+    overlap = len(a & b) / len(a | b)
+    return overlap >= 0.6
 
 
 def judge_response(resp: Dict[str, Any], state: Dict[str, Any]) -> Dict[str, Any]:
@@ -47,9 +77,8 @@ def judge_response(resp: Dict[str, Any], state: Dict[str, Any]) -> Dict[str, Any
 
     # Penalise reuse of previously attempted fixes.
     for attempted in state.get("attempted_fixes", []):
-        attempted_lower = attempted.lower()
         for fix in fixes:
-            if attempted_lower in str(fix).lower():
+            if _is_repeated_fix(str(attempted), str(fix)):
                 score -= 40
                 issues.append(f"Reuse of failed fix: {fix}")
                 break
