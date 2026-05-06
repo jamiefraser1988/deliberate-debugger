@@ -1,12 +1,26 @@
+import os
 from typing import Any, Dict, List
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from judge import judge_response
 from solver import run_solver
 from state import build_handoff
+
+
+def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
+    """Reject requests when DEBUGGER_API_KEY is set and the header doesn't match.
+
+    Empty/unset DEBUGGER_API_KEY disables the check — keeps local dev simple
+    and lets the existing test suite run unchanged.
+    """
+    expected = os.environ.get("DEBUGGER_API_KEY", "").strip()
+    if not expected:
+        return
+    if x_api_key != expected:
+        raise HTTPException(status_code=401, detail="Invalid or missing X-API-Key.")
 
 
 app = FastAPI(
@@ -41,7 +55,7 @@ async def debug_status() -> Dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/debug")
+@app.post("/debug", dependencies=[Depends(require_api_key)])
 async def debug(req: DebugRequest) -> Dict[str, Any]:
     """
     Main endpoint to debug a problem.

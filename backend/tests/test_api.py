@@ -90,3 +90,29 @@ def test_debug_with_code_and_attempted_fixes():
 def test_debug_missing_problem_returns_422():
     resp = client.post("/debug", json={})
     assert resp.status_code == 422
+
+
+def test_api_key_required_when_env_set(monkeypatch):
+    monkeypatch.setenv("DEBUGGER_API_KEY", "secret")
+    with patch("main.run_solver", return_value=GOOD_SOLVER_RESP):
+        resp = client.post("/debug", json={"problem": "x"})
+    assert resp.status_code == 401
+
+
+def test_api_key_accepted_when_header_matches(monkeypatch):
+    monkeypatch.setenv("DEBUGGER_API_KEY", "secret")
+    with patch("main.run_solver", return_value=GOOD_SOLVER_RESP):
+        resp = client.post(
+            "/debug",
+            json={"problem": "x"},
+            headers={"X-API-Key": "secret"},
+        )
+    assert resp.status_code == 200
+    assert resp.json()["mode"] == "normal"
+
+
+def test_api_key_disabled_when_env_blank(monkeypatch):
+    monkeypatch.setenv("DEBUGGER_API_KEY", "")
+    with patch("main.run_solver", return_value=GOOD_SOLVER_RESP):
+        resp = client.post("/debug", json={"problem": "x"})
+    assert resp.status_code == 200
